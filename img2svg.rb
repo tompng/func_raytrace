@@ -1,6 +1,8 @@
 require 'set'
 require 'pry'
 require 'chunky_png'
+require './func' rescue nil
+COLOR ||= [0x22, 0xcc, 0x88]
 
 def extract_paths img
   w, h = img.width, img.height
@@ -149,7 +151,7 @@ image = ChunkyPNG::Image.from_file 'out.png'
 svg_create 'out.svg', image.width do |proc|
   16.times do |a|
     threshold=16*a
-    color = "#%02x%02x%02x" % [0x44, 0x99, 0xdd].map{|c|[0,0xff,c*1.5*a/16].sort[1]}
+    color = '#%02x%02x%02x' % COLOR.map{|c|[0,0xff,c*1.5*a/16].sort[1]}
     paths = extract_paths(image){|c|c>threshold}
     proc.call color, paths
   end
