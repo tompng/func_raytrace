@@ -62,6 +62,7 @@ def coords2bezier coords
     dx = xb - xa
     dy = yb - ya
     dr = (dx**2+dy**2)**0.5
+    dr = 1 if dr == 0
     [dx/dr, dy/dr]
   }
   idx=0
@@ -71,23 +72,16 @@ def coords2bezier coords
     x1, y1 = coords[(idx+len)%coords.size]
     dx0, dy0 = dirs[idx]
     dx1, dy1 = dirs[(idx+len)%coords.size]
-    binding.pry if x0.nil?
-    lx = x1-x0
-    ly = y1-y0
-    s = (lx*dy1-dx1*ly) / (dx0*dy1-dy0*dx1)
-    px = x0+dx0*s
-    py = y0+dy0*s
-    if s.nan?
-      px = (x0+x1)/2
-      py = (y0+y1)/2
-    end
-    result = [[px, py], [x1, y1]]
+    l = ((x1-x0)**2+(y1-y0)**2)**0.5
+    px, py = x0+dx0*l/3, y0+dy0*l/3
+    qx, qy = x1-dx1*l/3, y1-dy1*l/3
+    result = [[px, py], [qx, qy], [x1, y1]]
     test = ->i{
       x, y = coords[(idx+i)%coords.size]
       t = i.fdiv len
-      ax = x0*(1-t)**2+2*t*(1-t)*px+t*t*x1
-      ay = y0*(1-t)**2+2*t*(1-t)*py+t*t*y1
-      (ax-x)**2+(ay-y)**2 < 2
+      ax = x0*(1-t)**3+3*t*(1-t)**2*px+3*t**2*(1-t)*qx+t**3*x1
+      ay = y0*(1-t)**3+3*t*(1-t)**2*py+3*t**2*(1-t)*qy+t**3*y1
+      (ax-x)**2+(ay-y)**2 < 0.09
     }
     return result if (1...len).all? &test
   end
@@ -101,27 +95,28 @@ def coords2bezier coords
       break if len == nextlen
       len = nextlen
     end
-    bezier << "Q #{result.map{|p|p.map(&:round).join(' ')}.join(', ')}"
+    bezier << "C #{result.map{|p|'%.1f %.1f'%p}.join(', ')}"
     idx += len
     break if idx == coords.size
   end
-  "M #{coords[0].join(' ')} #{bezier.join(' ')} z"
+  "M #{'%.1f %.1f'%coords.first} #{bezier.join(' ')} z"
 end
 def smooth coords
   tmp = coords.dup
-  10.times do
-    coords.each_with_index do |(x, y), i|
-      (xa, ya) = tmp[i-1]
-      (xb, yb) = tmp[(i+1)%coords.size]
-      dx = (xa+xb)/2.0 - x
-      dy = (ya+yb)/2.0 - y
-      dr=(dx**2+dy**2)**0.5
-      rmax=1
+  40.times do
+    tmp = coords.map.with_index do |(x, y), i|
+      xa, ya = tmp[i-1]
+      xb, yb = tmp[i]
+      xc, yc = tmp[(i+1)%coords.size]
+      dx = (xa+4*xb+xc)/6.0 - x
+      dy = (ya+4*yb+yc)/6.0 - y
+      dr = (dx**2+dy**2)**0.5
+      rmax = 1
       if dr>rmax
         dx *= rmax/dr
         dy *= rmax/dr
       end
-      tmp[i] = [x+dx, y+dy]
+      [x+dx, y+dy]
     end
   end
   tmp
@@ -134,7 +129,6 @@ def svg_create file, size
       next if coords.size < 3
       coords = smooth coords
       p coords.size
-      'M' + coords.map { |pos| "%.2f %.2f" % pos }.join(', L ') + ' z'
       coords2bezier coords
     end
     fills << %(<path fill="#{color}" d="#{lines.compact.join("\n")}" />)
@@ -150,9 +144,9 @@ end
 
 image = ChunkyPNG::Image.from_file 'out.png'
 svg_create 'out.svg', image.width do |proc|
-  16.times do |a|
-    threshold=16*a
-    color = '#'+threshold.to_s(16)*3
+  32.times do |a|
+    threshold=8*a
+    color = "#%02x%02x%02x" % [0x44, 0x99, 0xdd].map{|c|[0,0xff,c*1.5*a/32].sort[1]}
     paths = extract_paths(image){|c|c>threshold}
     proc.call color, paths
   end
