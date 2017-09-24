@@ -133,11 +133,14 @@ def svg_create file, size
     end
     fills << %(<path fill="#{color}" d="#{lines.compact.join("\n")}" />)
   end
-
   yield add
+
+  func = File.read('preview.svg').lines[2...-1].join.gsub('rgb(0%,0%,0%)','#163349') rescue nil
+
   File.write file, %(
-    <svg xmlns="http://www.w3.org/2000/svg" width="#{size}" height="#{size}" viewBox="0 0 #{size} #{size}">
+    <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="#{size}" height="#{size}" viewBox="0 0 #{size} #{size}">
       #{fills.join("\n")}
+      <g transform="scale(2,2) translate(32,24)">#{func}</g>
     </svg>
   )
 end
