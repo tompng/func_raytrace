@@ -20,18 +20,14 @@ class X
   end
   def - v
     if X === v
-      X.new min-v.min, max-v.max
+      X.new min-v.max, max-v.min
     else
       X.new min-v, max-v
     end
   end
   def * v
     return X.new(*[min*v, max*v].minmax) unless X === v
-    if min*max<0&&v.min*v.max<0
-      X.new(*[0, min*v.min, max*v.max, min*v.max, max*v.min].minmax)
-    else
-      X.new(*[min*v.min, max*v.max, min*v.max, max*v.min].minmax)
-    end
+    X.new(*[min*v.min, max*v.max, min*v.max, max*v.min].minmax)
   end
   def abs
     if min*max < 0
