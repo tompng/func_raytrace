@@ -15,9 +15,12 @@ class X
       X.new min+v, max+v
     end
   end
+  def mid
+    (min+max)/2
+  end
   def - v
     if X === v
-      X.new min+v.min, max+v.max
+      X.new min-v.min, max-v.max
     else
       X.new min-v, max-v
     end
@@ -60,10 +63,25 @@ def norm x, y, z
   [dx/dr, dy/dr, dz/dr]
 end
 
+def norm x, y, z
+  d=1e-6
+  dx = shape(x+d,y,z)-shape(x-d,y,z)
+  dy = shape(x,y+d,z)-shape(x,y-d,z)
+  dz = shape(x,y,z+d)-shape(x,y,z-d)
+  dr = (dx**2+dy**2+dz**2)**0.5
+  [dx/dr, dy/dr, dz/dr]
+end
+
 
 def trace cx, cy, d=0
-  x0, y0, z0 = 0, 0, 6
-  dx, dy, dz = X[cx,cx+d], X[cy,cy+d], -2
+  x0, y0, z0 = -2, -3, 5
+  dx, dy, dz = X[cx,cx+d], X[cy,cy+d], X[-2,-2]
+  rotx = Math.atan2((x0**2+y0**2)**0.5, z0)
+  rotz = Math::PI+Math.atan2(x0, y0)
+  xcos, xsin = Math.cos(rotx), Math.sin(rotx)
+  zcos, zsin = Math.cos(rotz), Math.sin(rotz)
+  dy, dz = dy*xcos-dz*xsin, dz*xcos+dy*xsin
+  dx, dy = dx*zcos+dy*zsin, dy*zcos-dx*zsin
 
   find = lambda do |min, max|
     range = X[min, max]
@@ -71,15 +89,16 @@ def trace cx, cy, d=0
     y = range*dy+y0
     z = range*dz+z0
     s = shape(x, y, z)
-    return min if s.max <= 0
-    return min if s.min <= 0 && max-min<1e-10
+    return range.mid if s.max <= 0
+    return range.mid if s.min <= 0 && max-min<1e-10
     return if s.min > 0
-    find.(min, (min+max)/2) || find.((min+max)/2, max)
+    find.(range.min, range.mid) || find.(range.mid, range.max)
   end
-  find.(0.0, 6.0)
+  dist = find.(0.0, 6.0)
+  [dist, x0+dx.mid*dist, y0+dy.mid*dist, z0+dz.mid*dist] if dist
 end
 
-size = 64
+size = 512
 img = ChunkyPNG::Image.new size, size
 skipmap = {}
 skip=8
@@ -92,9 +111,11 @@ size.times do |ix|
   p ix
   size.times do |iy|
     next unless skipmap[[ix/skip,iy/skip]]
-    dist = trace 2.0*ix/size-1, 2.0*iy/size-1
-    dist||=0
-    img[ix, iy] = (dist*256 % 256).round*0x1010101
+    dist, x, y, z = trace 2.0*ix/size-1, 2.0*iy/size-1
+    next unless dist
+    nx,ny,nz = norm x,y,z
+    color = (nx*0.3+ny*0.6+nz*0.1+1)/2
+    img[ix, size-iy-1] = (color*256 % 256).round*0x1010101
   end
 end
 img.save 'out.png'
