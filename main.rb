@@ -1,5 +1,13 @@
 require 'pry'
 require 'chunky_png'
+begin
+  require './func.rb'
+rescue LoadError
+  def shape x, y, z
+    x**4+y**4+z**4+x**3-y**2+x*y*3+x*z*4-z*y*2+z**3
+  end
+end
+
 class X
   attr_reader :min, :max
   def self.[] min, max
@@ -49,7 +57,6 @@ class X
 end
 class Numeric; def sqrt; Math.sqrt self; end; end
 
-
 def norm x, y, z
   d=1e-6
   dx = shape(x+d,y,z)-shape(x-d,y,z)
@@ -58,16 +65,6 @@ def norm x, y, z
   dr = (dx**2+dy**2+dz**2)**0.5
   [dx/dr, dy/dr, dz/dr]
 end
-
-def norm x, y, z
-  d=1e-6
-  dx = shape(x+d,y,z)-shape(x-d,y,z)
-  dy = shape(x,y+d,z)-shape(x,y-d,z)
-  dz = shape(x,y,z+d)-shape(x,y,z-d)
-  dr = (dx**2+dy**2+dz**2)**0.5
-  [dx/dr, dy/dr, dz/dr]
-end
-
 
 def trace cx, cy, d=0
   x0, y0, z0 = -2, -3, 5
