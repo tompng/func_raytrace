@@ -144,9 +144,9 @@ end
 
 image = ChunkyPNG::Image.from_file 'out.png'
 svg_create 'out.svg', image.width do |proc|
-  32.times do |a|
-    threshold=8*a
-    color = "#%02x%02x%02x" % [0x44, 0x99, 0xdd].map{|c|[0,0xff,c*1.5*a/32].sort[1]}
+  16.times do |a|
+    threshold=16*a
+    color = "#%02x%02x%02x" % [0x44, 0x99, 0xdd].map{|c|[0,0xff,c*1.5*a/16].sort[1]}
     paths = extract_paths(image){|c|c>threshold}
     proc.call color, paths
   end

@@ -110,9 +110,9 @@ size.times do |ix|
     dist, x, y, z = trace 2.0*ix/size-1, 2.0*iy/size-1
     next unless dist
     nx,ny,nz = norm x,y,z
-    color = (nx*0.3-ny*0.6+nz*0.1+1)/2
+    color = (nx*0.1-ny*0.3+nz*0.6+1)/2
+    color = 0.5 if color < 0.5
     img[ix, size-iy-1] = (color*256 % 256).round*0x1010101
   end
 end
 img.save 'out.png'
-# binding.pry
