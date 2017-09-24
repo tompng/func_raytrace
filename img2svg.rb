@@ -2,7 +2,7 @@ require 'set'
 require 'pry'
 require 'chunky_png'
 
-def extract_path img
+def extract_paths img
   w, h = img.width, img.height
   arr = w.times.map{h.times.map{nil}}
   w.times{|x|h.times{|y|
@@ -55,12 +55,64 @@ def extract_path img
   paths
 end
 
-def smooth path
-  tmp = path.dup
-  20.times do
-    path.each_with_index do |(x, y), i|
+def coords2bezier coords
+  dirs = coords.size.times.map{|i|
+    xa, ya = coords[i-1]
+    xb, yb = coords[(i+1)%coords.size]
+    dx = xb - xa
+    dy = yb - ya
+    dr = (dx**2+dy**2)**0.5
+    [dx/dr, dy/dr]
+  }
+  idx=0
+  bezier = []
+  check = lambda do |idx, len|
+    x0, y0 = coords[idx]
+    x1, y1 = coords[(idx+len)%coords.size]
+    dx0, dy0 = dirs[idx]
+    dx1, dy1 = dirs[(idx+len)%coords.size]
+    binding.pry if x0.nil?
+    lx = x1-x0
+    ly = y1-y0
+    s = (lx*dy1-dx1*ly) / (dx0*dy1-dy0*dx1)
+    px = x0+dx0*s
+    py = y0+dy0*s
+    if s.nan?
+      px = (x0+x1)/2
+      py = (y0+y1)/2
+    end
+    result = [[px, py], [x1, y1]]
+    test = ->i{
+      x, y = coords[(idx+i)%coords.size]
+      t = i.fdiv len
+      ax = x0*(1-t)**2+2*t*(1-t)*px+t*t*x1
+      ay = y0*(1-t)**2+2*t*(1-t)*py+t*t*y1
+      (ax-x)**2+(ay-y)**2 < 2
+    }
+    return result if (1...len).all? &test
+  end
+  loop do
+    len = 1
+    result = check[idx, len]
+    loop do
+      nextlen = [len*2, coords.size-idx].min
+      break unless tmp = check[idx, nextlen]
+      result = tmp
+      break if len == nextlen
+      len = nextlen
+    end
+    bezier << "Q #{result.map{|p|p.map(&:round).join(' ')}.join(', ')}"
+    idx += len
+    break if idx == coords.size
+  end
+  "M #{coords[0].join(' ')} #{bezier.join(' ')} z"
+end
+def smooth coords
+  tmp = coords.dup
+  10.times do
+    coords.each_with_index do |(x, y), i|
       (xa, ya) = tmp[i-1]
-      (xb, yb) = tmp[(i+1)%path.size]
+      (xb, yb) = tmp[(i+1)%coords.size]
       dx = (xa+xb)/2.0 - x
       dy = (ya+yb)/2.0 - y
       dr=(dx**2+dy**2)**0.5
@@ -78,12 +130,12 @@ end
 def svg_create file, size
   fills = []
   add = lambda do |color, paths|
-    lines = paths.map do |path|
-      next if path.size < 3
-      path = smooth path
-      p path.size
-      coords = path.map { |pos| "%.2f %.2f" % pos }
-      'M' + coords.join(', L ') + ' z'
+    lines = paths.map do |coords|
+      next if coords.size < 3
+      coords = smooth coords
+      p coords.size
+      'M' + coords.map { |pos| "%.2f %.2f" % pos }.join(', L ') + ' z'
+      coords2bezier coords
     end
     fills << %(<path fill="#{color}" d="#{lines.compact.join("\n")}" />)
   end
@@ -99,9 +151,9 @@ end
 image = ChunkyPNG::Image.from_file 'out.png'
 svg_create 'out.svg', image.width do |proc|
   16.times do |a|
-    proc.call '#'+a.to_s(16)*3, extract_path(image){|c|c>a*16}# && c<=(a+1)*16}
+    threshold=16*a
+    color = '#'+threshold.to_s(16)*3
+    paths = extract_paths(image){|c|c>threshold}
+    proc.call color, paths
   end
-  # proc.call '#444', extract_path(image){|c|c>0x40}
-  # proc.call '#888', extract_path(image){|c|c>0x80}
-  # proc.call '#ccc', extract_path(image){|c|c>0xc0}
 end
